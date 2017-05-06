@@ -411,7 +411,7 @@ io.on('connection', function(socket) {
       user.currGame = new game(user);
       user.success("CreateGame",user.currGame.id);
     } else {
-      user.error("CreateGame", 0, "The this user already has a game", data);
+      user.error("CreateGame", 0, "This user already has a game", data);
     }
   });
 
@@ -471,8 +471,8 @@ io.on('connection', function(socket) {
       user.success("SetBoard");
       if(user.currGame.canPlay()) {
         user.getOpponent().displayBoard = new displayBoard(BOARD_SIZE, BOARD_SIZE, board);
-        user.socket.emit('canStart',{});
-        user.getOpponent().socket.emit('canStart',{});
+        user.socket.emit('canPlay',{});
+        user.getOpponent().socket.emit('canPlay',{});
       }
     } else {
       user.error("SetBoard", 2, "Invalid ship placement", data);
@@ -520,6 +520,7 @@ io.on('connection', function(socket) {
       user.displayBoard.checkPoint(data.x,data.y);
       user.success("SubmitTurn");
       user.updateBoard();
+      user.getOpponent().socket.emit("updateOppDisp", {'board':user.displayBoard.board});
       if(user.checkWin()) {
         user.socket.emit("victory", {});
         user.getOpponent().emit("loss", {});
