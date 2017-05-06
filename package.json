@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/XenonMolecule/battleship-server#readme",
   "dependencies": {
+    "express": "^4.15.2",
     "socket.io": "^1.7.3"
   }
 }
