@@ -18,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/XenonMolecule/battleship-server/issues"
   },
-  "homepage": "https://github.com/XenonMolecule/battleship-server#readme"
+  "homepage": "https://github.com/XenonMolecule/battleship-server#readme",
+  "dependencies": {
+    "socket.io": "^1.7.3"
+  }
 }
