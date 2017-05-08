@@ -368,13 +368,15 @@ function generateToken() {
   do {
     token = Math.round(Math.random()*1000000);
   } while(findUser(token)!=-1)
+  return token;
 }
 
 function generateGameID() {
   var id = 0;
   do {
     id = Math.round(Math.random()*1000000);
-  } while(findGame(token)!=-1)
+  } while(findGame(id)!=-1)
+  return id;
 }
 
 // check that there is one of each of the right ship
@@ -577,6 +579,7 @@ io.on('connection', function(socket) {
       user.success("SubmitTurn");
       user.updateBoard();
       user.getOpponent().socket.emit("updateOppDisp", {'board':user.displayBoard.board});
+      notifyIfSunk(user);
       if(user.checkWin()) {
         user.socket.emit("victory", {});
         user.getOpponent().emit("loss", {});
