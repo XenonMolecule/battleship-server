@@ -11,7 +11,7 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
 //BEGIN HOSTING THE APP
-var port = process.env.PORT;
+var port = 39852/*process.env.PORT*/;
 http.listen(port,function(){
     console.log("The process is running on port:"+port);
 });
@@ -157,6 +157,9 @@ function game(owner) {
 function regShip(length, orientation) {
   this.size = length;
   this.orientation = orientation;
+  this.coords = [];
+  this.sigCoord = [];
+  this.sunk = false;
   switch(length) {
     case 2:
       this.type = "patrol";
@@ -172,25 +175,40 @@ function regShip(length, orientation) {
   }
   this.place = function(gameBoard, x, y) {
     var valid = true;
+    this.sigCoord = [x,y];
     for(var i = 0; i < length; i ++) {
       switch(orientation) {
         case 0:
           valid = valid && placeTile(gameBoard, x+i, y);
+          this.coords.push([x+i,y]);
           break;
         case 1:
           valid = valid && placeTile(gameBoard, x, y-i);
+          this.coords.push([x,y-i]);
           break;
         case 2:
           valid = valid && placeTile(gameBoard, x-i, y);
+          this.coords.push([x-i,y]);
           break;
         case 3:
           valid = valid && placeTile(gameBoard, x, y+i);
+          this.coords.push([x,y+i]);
           break;
         default:
           valid = false;
       }
     }
     return valid;
+  }
+  this.isSunk = function(dispBoard) {
+    for(var i = 0; i < this.coords.length; i ++) {
+      if(dispBoard[this.coords[1]][this.coords[0]] != 1) {
+        this.sunk = false;
+        return false;
+      }
+    }
+    this.sunk = false;
+    return true;
   }
 }
 
@@ -200,7 +218,9 @@ function regShip(length, orientation) {
 //          011100
 function specialShip(type, orientation) {
   this.orientation = orientation;
+  this.sigCoord = [];
   this.type = type.toLowerCase();
+  this.sunk = false;
   switch(type.toUpperCase()) {
     /*
     ** 1X1  X = coordinate passed to place function
@@ -208,21 +228,28 @@ function specialShip(type, orientation) {
     */
     case "SUBMARINE" :
       this.size = 4;
+      this.coords = [];
       this.place = function(gameBoard, x, y) {
         var valid = true;
         if(orientation!=0) {
           valid = valid && placeTile(gameBoard,x,y-1);
+          this.coords.push([x,y-1]);
         }
         if(orientation!=1) {
           valid = valid && placeTile(gameBoard,x-1,y);
+          this.coords.push([x-1,y]);
         }
         if(orientation!=2) {
           valid = valid && placeTile(gameBoard,x,y+1);
+          this.coords.push([x,y+1]);
         }
         if(orientation!=3) {
           valid = valid && placeTile(gameBoard,x+1,y);
+          this.coords.push([x+1,y]);
         }
         valid = valid && placeTile(gameBoard, x, y);
+        this.coords.push([x,y]);
+        this.sigCoord = [x,y];
         return valid;
       }
       break;
@@ -232,6 +259,7 @@ function specialShip(type, orientation) {
     */
     case "AIRCRAFT CARRIER" :
       this.size = 6;
+      this.coords = [];
       this.place = function(gameBoard, x, y) {
         var up, down, left, right;
         var valid = true;
@@ -257,11 +285,14 @@ function specialShip(type, orientation) {
           left = tileManipulator.placeUp;
         }
         valid = valid && placeTile(gameBoard, x, y);
+        this.coords.push([x,y]);
+        this.sigCoord = [x,y];
         function placeDir(func) {
           var res = func(gameBoard,x,y);
           valid = valid && res.success;
           x = res.x;
           y = res.y;
+          this.coords.push([x,y]);
         }
         placeDir(right);
         valid = valid && up(gameBoard,x,y).success; // place up, but don't continue from there
@@ -274,6 +305,14 @@ function specialShip(type, orientation) {
     default:
       this.size = 0;
       this.type = "";
+  }
+  this.isSunk = function(dispBoard) {
+    for(var i = 0; i < this.coords.length; i ++) {
+      if(dispBoard[this.coords[1]][this.coords[0]] != 1) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 
@@ -377,7 +416,7 @@ function setupBoard(rows,columns,ships) {
       } else {
         shipObj = new regShip(ship.length, ship.orientation);
       }
-      shipsArr.add(shipObj);
+      shipsArr.push(shipObj);
       valid = valid && shipObj.place(board, ship.x, ship.y);
     }
     valid = valid && checkShips(shipsArr);
@@ -394,6 +433,23 @@ function placeTile(array, x, y) {
     }
   }
   return false;
+}
+
+function notifyIfSunk(user) {
+  var board;
+  if(user.isOwner()) {
+    board = user.currGame.ownerBoard;
+  } else if(user.hasGame()) {
+    board = user.currGame.player2Board;
+  } else {
+    return;
+  }
+  for(var i = 0; i < board.ships; i ++){
+    if(!board.ships[i].sunk && board.ships[i].isSunk()) {
+      user.socket.emit('sinkUpdate', {'type': board.ships[i].type, 'coordX': board.ships[i].sigCoord[0],
+        'coordY': board.ships[i].sigCoord[1], 'orientation': board.ships[i].orientation});
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
