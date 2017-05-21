@@ -108,6 +108,7 @@ function connection(socket,id){
       message = message || "";
       parameters = parameters || {};
       errorCode = errorCode || 0;
+      console.log(JSON.stringify({'action' : action, 'errorCode' : errorCode, 'message' : message, 'parameters': parameters}));
       this.socket.emit('failure', {'action' : action, 'errorCode' : errorCode, 'message' : message, 'parameters': parameters});
     }
     users.push(this);
@@ -209,7 +210,7 @@ function regShip(length, orientation) {
         return false;
       }
     }
-    this.sunk = false;
+    this.sunk = true;
     return true;
   }
 }
@@ -299,6 +300,20 @@ function specialShip(type, orientation) {
         }
         placeDir(right);
         valid = valid && up(gameBoard,x,y).success; // place up, but don't continue from there
+        switch(orientation) {
+          case 0:
+            this.coords.push(buildArr(x,y-1));
+            break;
+          case 1:
+            this.coords.push(buildArr(x-1,y));
+            break;
+          case 2:
+            this.coords.push(buildArr(x,y+1));
+            break;
+          case 3:
+            this.coords.push(buildArr(x+1,y));
+            break;
+        }
         placeDir(right);
         placeDir(up);
         placeDir(right);
@@ -316,7 +331,7 @@ function specialShip(type, orientation) {
         return false;
       }
     }
-    this.sunk = false;
+    this.sunk = true;
     return true;
   }
 }
@@ -342,7 +357,7 @@ function dispBoard(width, height, oppBoard) {
   this.board = fillArray(width,height, 0);
   this.gameBoard = oppBoard;
   this.checkPoint = function(x,y) {
-    if(oppBoard.isOccupied(x,y)) {
+    if(this.gameBoard.isOccupied(x,y)) {
       this.board[y][x] = 1;
     } else {
       this.board[y][x] = 2;
@@ -449,9 +464,9 @@ function placeTile(array, x, y) {
 function notifyIfSunk(user) {
   var board;
   if(user.isOwner()) {
-    board = user.currGame.ownerBoard;
-  } else if(user.hasGame()) {
     board = user.currGame.player2Board;
+  } else if(user.hasGame()) {
+    board = user.currGame.ownerBoard;
   } else {
     return;
   }
@@ -544,7 +559,6 @@ io.on('connection', function(socket) {
     if(board.success && user.hasGame()) {
       user.success("SetBoard");
       if(user.currGame.canPlay()) {
-        user.getOpponent().displayBoard = new dispBoard(BOARD_SIZE, BOARD_SIZE, board);
         user.currGame.owner.socket.emit('canPlay',{});
       }
     } else {
@@ -575,8 +589,8 @@ io.on('connection', function(socket) {
       user.socket.emit('startGame',{});
       user.currGame.player2.socket.emit('startGame', {});
       user.currGame.currTurn = (Math.round(Math.random()) == 0);
-      user.displayBoard = new dispBoard(BOARD_SIZE, BOARD_SIZE, user.currGame.ownerBoard);
-      user.currGame.player2.displayBoard = new dispBoard(BOARD_SIZE, BOARD_SIZE, user.currGame.player2Board);
+      user.displayBoard = new dispBoard(BOARD_SIZE, BOARD_SIZE, user.currGame.player2Board);
+      user.currGame.player2.displayBoard = new dispBoard(BOARD_SIZE, BOARD_SIZE, user.currGame.ownerBoard);
       user.currGame.getCurrPlayer().socket.emit("takeTurn",{});
     } else {
       if(!user.isOwner()) {
